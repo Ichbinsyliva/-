@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>宏福苑災後尋親資訊平台</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            red: '#EF4444',   // 失聯
+                            green: '#10B981', // 已找到
+                            blue: '#3B82F6',  // 寵物失聯
+                            purple: '#8B5CF6', // 寵物待認領
+                            gray: '#6B7280'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            -webkit-tap-highlight-color: transparent;
+            background-color: #f3f4f6;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        /* Animation for AI processing */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.2); opacity: 0; }
+        }
+        .ai-processing::after {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #8b5cf6;
+            margin-left: 5px;
+            animation: pulse-ring 1s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        /* Modal Backdrop */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3B82F6;
+            width: 20px;
+            height: 20px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="font-sans text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm z-20 flex-none">
+        <div class="px-4 py-3 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fa-solid fa-house-chimney-crack text-brand-red mr-2"></i>
+                    宏福苑尋親平台
+                </h1>
+            </div>
+            <button onclick="app.togglePage('post')" class="bg-brand-red text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg active:scale-95 transition-transform">
+                <i class="fa-solid fa-plus mr-1"></i> 發布
+            </button>
+        </div>
+
+        <!-- Offline/Demo Mode Alert -->
+        <div id="demo-mode-alert" class="hidden bg-yellow-100 px-4 py-1 text-xs text-yellow-800 text-center border-b border-yellow-200">
+            <i class="fa-solid fa-wifi-slash mr-1"></i> 無法連接雲端，目前顯示演示數據
+        </div>
+        
+        <!-- Search & Filter Bar (Only visible on Home) -->
+        <div id="filter-bar" class="px-4 pb-3 space-y-3 pt-3">
+            <!-- Search Input -->
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                <input type="text" id="searchInput" placeholder="搜尋姓名、座號或特徵..." 
+                    class="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue transition-all"
+                    oninput="app.handleSearch(this.value)">
+                <span id="ai-search-indicator" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-purple-600 hidden">
+                    AI 語義分析中...
+                </span>
+            </div>
+
+            <!-- Filter Chips -->
+            <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                <button onclick="app.setFilter('all')" class="filter-btn active whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-gray-800 text-white transition-colors" data-filter="all">
+                    全部
+                </button>
+                <button onclick="app.setFilter('missing')" class="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-white text-gray-600 border border-gray-200" data-filter="missing">
+                    <span class="w-2 h-2 rounded-full bg-red-500 inline-block mr-1"></span>失聯中
+                </button>
+                <button onclick="app.setFilter('found')" class="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-white text-gray-600 border border-gray-200" data-filter="found">
+                    <span class="w-2 h-2 rounded-full bg-green-500 inline-block mr-1"></span>已平安
+                </button>
+                <button onclick="app.setFilter('pet_missing')" class="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-white text-gray-600 border border-gray-200" data-filter="pet_missing">
+                    <span class="w-2 h-2 rounded-full bg-blue-500 inline-block mr-1"></span>寵物失聯
+                </button>
+                <button onclick="app.setFilter('pet_found')" class="filter-btn whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium bg-white text-gray-600 border border-gray-200" data-filter="pet_found">
+                    <span class="w-2 h-2 rounded-full bg-purple-500 inline-block mr-1"></span>寵物待認領
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto bg-gray-50 relative scroll-smooth" id="main-container">
+        
+        <!-- View: List/Feed -->
+        <div id="view-feed" class="p-4 space-y-4 pb-24">
+            <!-- Content injected by JS -->
+            <div id="feed-content" class="space-y-4"></div>
+            
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden flex flex-col items-center justify-center py-10 text-center">
+                <div class="bg-gray-200 p-4 rounded-full mb-3">
+                    <i class="fa-solid fa-inbox text-3xl text-gray-400"></i>
+                </div>
+                <p class="text-gray-500 text-sm">目前沒有資訊</p>
+                <p class="text-xs text-gray-400 mt-1">點擊右上角「發布」新增資訊</p>
+            </div>
+        </div>
+
+        <!-- View: Post Form (Overlay) -->
+        <div id="view-post" class="hidden absolute inset-0 bg-white z-30 overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between z-10">
+                <button onclick="app.togglePage('home')" class="text-gray-600 p-2">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+                <h2 class="font-bold text-lg">發布尋親/報平安</h2>
+                <button id="btn-submit" onclick="app.submitForm()" class="text-brand-blue font-bold text-sm px-2 flex items-center">
+                    發布
+                </button>
+            </div>
+
+            <div class="p-5 space-y-6 pb-20">
+                
+                <!-- Type Selection -->
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="cursor-pointer border-2 border-brand-red rounded-lg p-3 flex flex-col items-center justify-center transition-all bg-red-50 hover:bg-red-100 relative overflow-hidden group">
+                        <input type="radio" name="entryType" value="missing" class="peer sr-only" checked onchange="app.toggleFormType()">
+                        <div class="absolute inset-0 border-2 border-transparent peer-checked:border-brand-red rounded-lg pointer-events-none"></div>
+                        <i class="fa-solid fa-person-circle-question text-2xl text-brand-red mb-1"></i>
+                        <span class="text-sm font-bold text-brand-red" id="label-type-missing">尋找失聯者</span>
+                        <i class="fa-solid fa-circle-check absolute top-2 right-2 text-brand-red opacity-0 peer-checked:opacity-100"></i>
+                    </label>
+                    <label class="cursor-pointer border-2 border-gray-200 rounded-lg p-3 flex flex-col items-center justify-center transition-all hover:bg-gray-50 relative overflow-hidden">
+                        <input type="radio" name="entryType" value="found" class="peer sr-only" onchange="app.toggleFormType()">
+                        <div class="absolute inset-0 border-2 border-transparent peer-checked:border-brand-green rounded-lg pointer-events-none"></div>
+                        <i class="fa-solid fa-hand-holding-heart text-2xl text-gray-400 peer-checked:text-brand-green mb-1"></i>
+                        <span class="text-sm font-bold text-gray-500 peer-checked:text-brand-green" id="label-type-found">我已平安/找到人</span>
+                        <i class="fa-solid fa-circle-check absolute top-2 right-2 text-brand-green opacity-0 peer-checked:opacity-100"></i>
+                    </label>
+                </div>
+
+                <!-- Basic Info -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-bold text-gray-900 border-l-4 border-brand-blue pl-2">基本資料</h3>
+                    
+                    <!-- Building Select -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">大樓座號 (宏福苑) <span class="text-red-500">*</span></label>
+                        <select id="input-building" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm focus:ring-brand-blue focus:border-brand-blue bg-white">
+                            <option value="">請選擇座號</option>
+                            <option value="宏仁樓 (A座)">宏仁樓 (A座)</option>
+                            <option value="宏道樓 (B座)">宏道樓 (B座)</option>
+                            <option value="宏新樓 (C座)">宏新樓 (C座)</option>
+                            <option value="宏建樓 (D座)">宏建樓 (D座)</option>
+                            <option value="宏泰樓 (E座)">宏泰樓 (E座)</option>
+                            <option value="宏昌樓 (F座)">宏昌樓 (F座)</option>
+                            <option value="宏盛樓 (G座)">宏盛樓 (G座)</option>
+                            <option value="宏志樓 (H座)">宏志樓 (H座)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">室號 <span class="text-red-500">*</span></label>
+                            <input type="text" id="input-room" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm" placeholder="例：1205">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">管理密碼 (4位數) <span class="text-red-500">*</span></label>
+                            <input type="tel" id="input-pin" maxlength="4" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm bg-yellow-50 focus:ring-yellow-400 focus:border-yellow-400" placeholder="用於日後更新狀態">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">姓名/暱稱 <span class="text-red-500">*</span></label>
+                        <input type="text" id="input-name" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm" placeholder="輸入姓名">
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="col-span-1">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">年齡</label>
+                            <input type="number" id="input-age" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm" placeholder="歲">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">性別</label>
+                            <div class="flex gap-2">
+                                <label class="flex-1 border rounded-lg py-2.5 text-center text-sm cursor-pointer hover:bg-gray-50">
+                                    <input type="radio" name="gender" value="男" class="sr-only peer">
+                                    <span class="peer-checked:text-blue-600 peer-checked:font-bold">男</span>
+                                </label>
+                                <label class="flex-1 border rounded-lg py-2.5 text-center text-sm cursor-pointer hover:bg-gray-50">
+                                    <input type="radio" name="gender" value="女" class="sr-only peer">
+                                    <span class="peer-checked:text-pink-600 peer-checked:font-bold">女</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <input id="check-pet" type="checkbox" class="w-5 h-5 text-brand-blue border-gray-300 rounded focus:ring-brand-blue" onchange="app.toggleFormType()">
+                        <label for="check-pet" class="ml-2 block text-sm text-gray-900 font-bold">這是一條寵物資訊 🐾</label>
+                    </div>
+                </div>
+
+                <!-- Photos -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-medium text-gray-700">照片上傳 (自動壓縮)</label>
+                    <div class="flex items-center justify-center w-full">
+                        <label for="file-upload" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <i class="fa-solid fa-camera text-2xl text-gray-400 mb-2"></i>
+                                <p class="text-xs text-gray-500">點擊拍照或上傳</p>
+                                <p class="text-[10px] text-gray-400 mt-1">系統將自動壓縮圖片以確保上傳成功</p>
+                            </div>
+                            <input id="file-upload" type="file" class="hidden" accept="image/*" multiple onchange="app.handleImageUpload(this)">
+                        </label>
+                    </div>
+                    <div id="image-preview-container" class="flex gap-2 overflow-x-auto py-2">
+                        <!-- Preview Images will go here -->
+                    </div>
+                </div>
+
+                <!-- Details & AI Analysis -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs font-medium text-gray-700">備註 & 特徵</label>
+                        <span id="ai-tag-status" class="text-xs text-purple-600 hidden ai-processing">DeepSeek 分析中...</span>
+                    </div>
+                    <textarea id="input-remarks" rows="3" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm" placeholder="請描述特徵、最後出現位置、身體狀況等..." oninput="app.handleRemarksInput(this.value)"></textarea>
+                    
+                    <!-- Auto-generated Tags -->
+                    <div id="tags-container" class="flex flex-wrap gap-2 pt-1 min-h-[24px]"></div>
+                </div>
+
+                <!-- Contact -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-medium text-gray-700">聯繫電話 <span class="text-red-500">*</span></label>
+                    <input type="tel" id="input-contact" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm" placeholder="請輸入聯繫電話">
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Pin Verification Modal -->
+    <div id="pin-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all scale-100">
+            <h3 class="text-lg font-bold text-gray-900 mb-2 text-center">身份驗證</h3>
+            <p class="text-sm text-gray-500 mb-4 text-center">為了防止誤操作，請輸入發布時設定的 4 位數密碼。</p>
+            
+            <input type="tel" id="verify-pin-input" maxlength="4" class="w-full text-center text-2xl tracking-widest border-2 border-gray-200 rounded-lg py-3 mb-4 focus:border-brand-blue focus:ring-0 outline-none font-mono" placeholder="••••">
+            
+            <div id="pin-error" class="text-red-500 text-xs text-center mb-3 hidden">密碼錯誤，請重試</div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="app.closePinModal()" class="w-full py-2.5 rounded-lg text-gray-600 bg-gray-100 font-medium text-sm">取消</button>
+                <button id="btn-confirm-pin" onclick="app.confirmPin()" class="w-full py-2.5 rounded-lg text-white bg-brand-blue font-bold text-sm flex items-center justify-center">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer / Floating Info -->
+    <div class="fixed bottom-4 right-4 z-10">
+        <button onclick="window.scrollTo({top:0, behavior:'smooth'})" class="bg-gray-800 text-white w-10 h-10 rounded-full shadow-lg flex items-center justify-center opacity-80 hover:opacity-100">
+            <i class="fa-solid fa-arrow-up"></i>
+        </button>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        /**
+         * Mock DeepSeek API Service
+         */
+        class MockDeepSeekService {
+            constructor() {
+                this.processingDelay = 600;
+                this.tagRules = {
+                    "傷患": ["血", "傷", "痛", "斷", "骨折", "無法移動"],
+                    "老人": ["爺", "奶", "老", "年長", "輪椅", "拐杖", "70", "80", "90"],
+                    "兒童": ["孩", "童", "嬰", "兒", "小學", "幼兒", "弟", "妹"],
+                    "特殊需求": ["藥", "糖尿病", "心臟", "透析", "聽障", "視障", "殘"],
+                    "寵物": ["貓", "狗", "毛", "尾巴", "爪", "喵", "汪"]
+                };
+            }
+
+            async autoCategorize(text) {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        const tags = new Set();
+                        for (const [category, keywords] of Object.entries(this.tagRules)) {
+                            if (keywords.some(k => text.includes(k))) {
+                                tags.add(category);
+                            }
+                        }
+                        resolve(Array.from(tags));
+                    }, this.processingDelay);
+                });
+            }
+
+            async similarityCheck(newEntry, existingEntries) {
+                return new Promise(resolve => {
+                    const similar = existingEntries.filter(entry => {
+                        const sameBuilding = entry.building === newEntry.building;
+                        const sameName = entry.name === newEntry.name;
+                        let score = 0;
+                        if (sameBuilding) score += 40;
+                        if (sameName) score += 60;
+                        return score >= 70;
+                    });
+                    resolve({ hasDuplicate: similar.length > 0, similarEntries: similar });
+                });
+            }
+
+            async semanticSearch(query, entries) {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        if (!query) resolve(entries);
+                        const lowerQuery = query.toLowerCase();
+                        const results = entries.map(entry => {
+                            let score = 0;
+                            if (entry.name.includes(query)) score += 100;
+                            if (entry.building.includes(query)) score += 80;
+                            if (entry.room.includes(query)) score += 80;
+                            if (entry.remarks && entry.remarks.includes(query)) score += 50;
+                            if ((lowerQuery.includes("老") || lowerQuery.includes("長輩")) && entry.tags.includes("老人")) score += 40;
+                            if ((lowerQuery.includes("傷") || lowerQuery.includes("救")) && entry.tags.includes("傷患")) score += 40;
+                            return { ...entry, searchScore: score };
+                        }).filter(e => e.searchScore > 0).sort((a, b) => b.searchScore - a.searchScore);
+                        resolve(results);
+                    }, 400);
+                });
+            }
+        }
+
+        /**
+         * Main Application Logic
+         */
+        class DisasterReliefApp {
+            constructor() {
+                this.API_URL = 'https://script.google.com/macros/s/AKfycbzhwjRG4WMLV3CYcrpt24do0fishiWfFPVP-6oW3MojTI0PhlnC2qTzUzbuHd7x3z_A/exec';
+                this.db = [];
+                this.aiService = new MockDeepSeekService();
+                this.currentFilter = 'all';
+                this.imageFiles = [];
+                this.autoTags = [];
+                this.pendingAction = null;
+                this.isDemoMode = false;
+                
+                this.init();
+            }
+
+            async init() {
+                await this.fetchData();
+            }
+
+            async fetchData() {
+                const container = document.getElementById('feed-content');
+                const emptyState = document.getElementById('empty-state');
+                const demoAlert = document.getElementById('demo-mode-alert');
+                
+                // Show Loading State
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-12">
+                        <div class="loader mb-3"></div>
+                        <p class="text-sm text-gray-500">正在連接雲端數據庫...</p>
+                    </div>
+                `;
+                emptyState.classList.add('hidden');
+
+                try {
+                    const response = await fetch(this.API_URL);
+                    if (!response.ok) throw new Error("Network error");
+                    
+                    const data = await response.json();
+                    
+                    // Convert timestamps back to numbers if needed (Sheets might send string)
+                    this.db = data.map(item => ({
+                        ...item,
+                        timestamp: Number(item.timestamp),
+                        photos: Array.isArray(item.photos) ? item.photos : []
+                    })).sort((a, b) => b.timestamp - a.timestamp); // Sort by newest
+
+                    this.isDemoMode = false;
+                    if(demoAlert) demoAlert.classList.add('hidden');
+                    this.applyFilters();
+                } catch (error) {
+                    console.error("Fetch Error:", error);
+                    // Fallback to demo mode
+                    this.loadDemoData(container, demoAlert);
+                }
+            }
+
+            loadDemoData(container, demoAlert) {
+                this.isDemoMode = true;
+                if(demoAlert) demoAlert.classList.remove('hidden');
+
+                // Load some dummy data for demo purposes
+                this.db = [
+                    {
+                        id: 'demo1',
+                        building: '宏仁樓 (A座)',
+                        room: '1001',
+                        name: '範例: 張先生',
+                        age: 65,
+                        gender: '男',
+                        status: 'missing',
+                        tags: ['老人', '演示資料'],
+                        remarks: '這是一條演示資料，因為無法連接雲端。',
+                        contact: '0912345678',
+                        timestamp: Date.now(),
+                        photos: [],
+                        pin: '1234'
+                    },
+                    {
+                        id: 'demo2',
+                        building: '宏昌樓 (F座)',
+                        room: '5A',
+                        name: '範例: 小黑',
+                        age: 2,
+                        gender: '未知',
+                        status: 'pet_missing',
+                        tags: ['寵物', '狗', '演示資料'],
+                        remarks: '黑色貴賓狗，這是演示資料。',
+                        contact: '0987654321',
+                        timestamp: Date.now() - 3600000,
+                        photos: [],
+                        pin: '1234'
+                    }
+                ];
+                
+                this.applyFilters();
+            }
+
+            // --- UI Interaction ---
+
+            togglePage(page) {
+                if (page === 'post') {
+                    document.getElementById('view-post').classList.remove('hidden');
+                    document.getElementById('filter-bar').classList.add('hidden');
+                    document.body.style.overflow = 'hidden';
+                    // Reset Form
+                    this.imageFiles = [];
+                    document.getElementById('image-preview-container').innerHTML = '';
+                    document.getElementById('input-pin').value = '';
+                } else {
+                    document.getElementById('view-post').classList.add('hidden');
+                    document.getElementById('filter-bar').classList.remove('hidden');
+                    document.body.style.overflow = '';
+                }
+            }
+
+            toggleFormType() {
+                const isPet = document.getElementById('check-pet').checked;
+                const labelMissing = document.getElementById('label-type-missing');
+                const labelFound = document.getElementById('label-type-found');
+
+                if (isPet) {
+                    labelMissing.textContent = "寵物走失";
+                    labelFound.textContent = "發現走失寵物 (待認領)";
+                } else {
+                    labelMissing.textContent = "尋找失聯者";
+                    labelFound.textContent = "我已平安/找到人";
+                }
+            }
+
+            setFilter(filter) {
+                this.currentFilter = filter;
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    if (btn.dataset.filter === filter) {
+                        btn.classList.add('bg-gray-800', 'text-white');
+                        btn.classList.remove('bg-white', 'text-gray-600', 'border', 'border-gray-200');
+                    } else {
+                        btn.classList.remove('bg-gray-800', 'text-white');
+                        btn.classList.add('bg-white', 'text-gray-600', 'border', 'border-gray-200');
+                    }
+                });
+                this.applyFilters();
+            }
+
+            // --- AI Features ---
+
+            handleRemarksInput(text) {
+                const statusEl = document.getElementById('ai-tag-status');
+                if (this.analysisTimeout) clearTimeout(this.analysisTimeout);
+                
+                if (text.length > 2) {
+                    statusEl.classList.remove('hidden');
+                    this.analysisTimeout = setTimeout(async () => {
+                        const tags = await this.aiService.autoCategorize(text);
+                        this.autoTags = tags;
+                        this.renderTags(tags);
+                        statusEl.classList.add('hidden');
+                    }, 800);
+                } else {
+                    statusEl.classList.add('hidden');
+                }
+            }
+
+            renderTags(tags) {
+                const container = document.getElementById('tags-container');
+                container.innerHTML = tags.map(tag => `
+                    <span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full flex items-center">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1 text-[10px]"></i> ${tag}
+                    </span>
+                `).join('');
+            }
+
+            async handleSearch(query) {
+                const indicator = document.getElementById('ai-search-indicator');
+                if (!query) {
+                    this.applyFilters();
+                    return;
+                }
+                indicator.classList.remove('hidden');
+                const results = await this.aiService.semanticSearch(query, this.db);
+                this.renderFeed(results);
+                indicator.classList.add('hidden');
+            }
+
+            // --- Form Handling & Image Compression ---
+
+            handleImageUpload(input) {
+                const files = Array.from(input.files);
+                const container = document.getElementById('image-preview-container');
+                
+                files.forEach(file => {
+                    // Use FileReader + Canvas to resize image before saving
+                    // This is crucial for Google Sheets 50k char limit
+                    this.resizeImage(file, 600, (resizedBase64) => {
+                        this.imageFiles.push(resizedBase64);
+                        const div = document.createElement('div');
+                        div.className = 'flex-shrink-0 w-24 h-24 relative rounded-lg overflow-hidden border border-gray-200 shadow-sm';
+                        div.innerHTML = `<img src="${resizedBase64}" class="w-full h-full object-cover">`;
+                        container.appendChild(div);
+                    });
+                });
+            }
+
+            resizeImage(file, maxWidth, callback) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Compress to JPEG 0.7 quality to save space
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        callback(dataUrl);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            async submitForm() {
+                const building = document.getElementById('input-building').value;
+                const room = document.getElementById('input-room').value;
+                const name = document.getElementById('input-name').value;
+                const contact = document.getElementById('input-contact').value;
+                const pin = document.getElementById('input-pin').value;
+                const gender = document.querySelector('input[name="gender"]:checked')?.value || '未知';
+                const age = document.getElementById('input-age').value;
+                const isPet = document.getElementById('check-pet').checked;
+                const remarks = document.getElementById('input-remarks').value;
+                const formType = document.querySelector('input[name="entryType"]:checked').value; 
+
+                if (!building || !room || !name || !contact) {
+                    alert('請填寫必填欄位 (座號、室號、姓名、電話)');
+                    return;
+                }
+                
+                if (!pin || pin.length !== 4) {
+                    alert('請設定 4 位數管理密碼，以便日後更新狀態。');
+                    return;
+                }
+
+                let finalStatus = 'missing';
+                if (isPet) {
+                    finalStatus = formType === 'missing' ? 'pet_missing' : 'pet_found';
+                } else {
+                    finalStatus = formType === 'missing' ? 'missing' : 'found';
+                }
+
+                const newEntry = {
+                    id: Date.now().toString(),
+                    building, room, name, age, gender, remarks, contact, pin,
+                    status: finalStatus,
+                    tags: isPet ? ['寵物', ...this.autoTags] : this.autoTags,
+                    photos: this.imageFiles, // Now contains compressed images
+                    timestamp: Date.now()
+                };
+
+                // AI Check locally
+                const check = await this.aiService.similarityCheck(newEntry, this.db);
+                if (check.hasDuplicate) {
+                    const confirmPost = confirm(`DeepSeek 檢測到 ${check.similarEntries.length} 筆相似資料。確定要發布嗎？`);
+                    if (!confirmPost) return;
+                }
+                
+                // If in demo mode, just add to local array and return
+                if (this.isDemoMode) {
+                    this.db.unshift(newEntry);
+                    this.togglePage('home');
+                    this.applyFilters();
+                    alert('注意：由於目前為演示模式，資料僅暫存於此頁面，刷新後將消失。');
+                    return;
+                }
+
+                // Show Loading
+                const btn = document.getElementById('btn-submit');
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loader mr-2 w-4 h-4"></div> 發布中...';
+
+                try {
+                    // Send to Google Sheet
+                    const response = await fetch(this.API_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', // Important for simple POST to script
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'create', data: newEntry })
+                    });
+
+                    // Optimistic update (since no-cors returns opaque response)
+                    // Or we assume success if no network error
+                    this.db.unshift(newEntry);
+                    this.togglePage('home');
+                    this.applyFilters();
+                    
+                    // Clear fields
+                    document.getElementById('input-name').value = '';
+                    document.getElementById('input-remarks').value = '';
+                    this.autoTags = [];
+                    document.getElementById('tags-container').innerHTML = '';
+                    
+                    // Trigger background refresh to be safe
+                    setTimeout(() => this.fetchData(), 2000);
+
+                } catch (e) {
+                    alert('發布失敗，請檢查網路。');
+                    console.error(e);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            }
+
+            // --- Status Update & Security ---
+
+            requestUpdateStatus(id, newStatus) {
+                this.pendingAction = { id, newStatus };
+                document.getElementById('pin-modal').classList.remove('hidden');
+                document.getElementById('verify-pin-input').value = '';
+                document.getElementById('verify-pin-input').focus();
+                document.getElementById('pin-error').classList.add('hidden');
+            }
+
+            closePinModal() {
+                document.getElementById('pin-modal').classList.add('hidden');
+                this.pendingAction = null;
+            }
+
+            async confirmPin() {
+                const inputPin = document.getElementById('verify-pin-input').value;
+                const entry = this.db.find(e => e.id === this.pendingAction.id);
+                
+                // Validate PIN Locally first
+                if (entry && String(inputPin) === String(entry.pin)) {
+                    
+                    if (this.isDemoMode) {
+                         // Local Update Only for Demo
+                        entry.status = this.pendingAction.newStatus;
+                        entry.timestamp = Date.now();
+                        this.applyFilters();
+                        this.closePinModal();
+                        alert('演示模式：狀態已更新 (僅本地有效)');
+                        return;
+                    }
+                    
+                    // Show Loading
+                    const btn = document.getElementById('btn-confirm-pin');
+                    const originalText = btn.innerText;
+                    btn.innerHTML = '<div class="loader w-4 h-4 border-white border-t-transparent"></div>';
+                    
+                    try {
+                         // Send update to Cloud
+                        await fetch(this.API_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                action: 'update', 
+                                data: { 
+                                    id: entry.id, 
+                                    status: this.pendingAction.newStatus,
+                                    timestamp: Date.now() 
+                                } 
+                            })
+                        });
+
+                        // Local Update
+                        entry.status = this.pendingAction.newStatus;
+                        entry.timestamp = Date.now();
+                        this.applyFilters();
+                        this.closePinModal();
+                        alert('狀態更新成功！');
+                        
+                    } catch (e) {
+                        alert('更新失敗，請檢查網路');
+                    } finally {
+                        btn.innerText = originalText;
+                    }
+
+                } else {
+                    document.getElementById('pin-error').classList.remove('hidden');
+                }
+            }
+
+            // --- Rendering ---
+
+            applyFilters() {
+                let filtered = this.db;
+                if (this.currentFilter !== 'all') {
+                    filtered = filtered.filter(item => item.status === this.currentFilter);
+                }
+                this.renderFeed(filtered);
+            }
+
+            renderFeed(data) {
+                const container = document.getElementById('feed-content');
+                const emptyState = document.getElementById('empty-state');
+                container.innerHTML = '';
+                
+                if (!data || data.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+                emptyState.classList.add('hidden');
+                data.forEach(item => container.appendChild(this.createCard(item)));
+            }
+
+            createCard(item) {
+                let statusConfig = {
+                    text: '失聯中', color: 'red', icon: 'fa-circle-question', bg: 'bg-red-50', border: 'border-red-100'
+                };
+                
+                switch(item.status) {
+                    case 'found':
+                        statusConfig = { text: '已平安/找到', color: 'green', icon: 'fa-check-circle', bg: 'bg-green-50', border: 'border-green-100' };
+                        break;
+                    case 'pet_missing':
+                        statusConfig = { text: '寵物走失', color: 'blue', icon: 'fa-paw', bg: 'bg-blue-50', border: 'border-blue-100' };
+                        break;
+                    case 'pet_found':
+                        statusConfig = { text: '寵物待認領', color: 'purple', icon: 'fa-hand-holding-heart', bg: 'bg-purple-50', border: 'border-purple-100' };
+                        break;
+                }
+
+                const date = new Date(item.timestamp);
+                const timeStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+
+                const div = document.createElement('div');
+                div.className = `bg-white rounded-xl card-shadow overflow-hidden border-l-4 border-${statusConfig.color}-500 relative`;
+                
+                // Tags
+                const tagsHtml = (item.tags || []).map(t => 
+                    `<span class="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 mr-1">#${t}</span>`
+                ).join('');
+
+                // Image
+                let imageHtml = '';
+                if (item.photos && item.photos.length > 0) {
+                    imageHtml = `<div class="mt-3 -mx-4">
+                        <img src="${item.photos[0]}" class="w-full h-auto max-h-80 object-cover border-t border-b border-gray-100" loading="lazy">
+                       </div>`;
+                    if (item.photos.length > 1) {
+                        imageHtml += `<div class="text-xs text-gray-400 mt-1 pl-1">還有 ${item.photos.length - 1} 張照片...</div>`
+                    }
+                }
+
+                // Buttons
+                let actionButtons = '';
+                if (item.status === 'missing' || item.status === 'pet_missing') {
+                    actionButtons = `
+                        <button onclick="app.requestUpdateStatus('${item.id}', '${item.status === 'pet_missing' ? 'pet_found' : 'found'}')" class="flex-1 py-2.5 text-sm text-green-700 font-bold bg-green-50 rounded-lg mr-2 border border-green-200 active:scale-95 transition-transform">
+                            <i class="fa-solid fa-check mr-1"></i> 標記已找到
+                        </button>
+                    `;
+                } else if (item.status === 'pet_found') {
+                     actionButtons = `
+                        <button onclick="app.requestUpdateStatus('${item.id}', 'found')" class="flex-1 py-2.5 text-sm text-gray-700 font-bold bg-gray-100 rounded-lg mr-2 border border-gray-200 active:scale-95 transition-transform">
+                            <i class="fa-solid fa-house-user mr-1"></i> 標記主人已領回
+                        </button>
+                    `;
+                }
+
+                div.innerHTML = `
+                    <div class="p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${statusConfig.bg} text-${statusConfig.color}-700 mb-2">
+                                    <i class="fa-solid ${statusConfig.icon} mr-1.5"></i> ${statusConfig.text}
+                                </span>
+                                <h3 class="text-xl font-bold text-gray-900 leading-tight">${item.name} 
+                                    <span class="text-sm font-normal text-gray-500 ml-1">
+                                        ${item.gender === '未知' ? '' : `(${item.gender}, ${item.age}歲)`}
+                                    </span>
+                                </h3>
+                            </div>
+                            <div class="text-right flex flex-col items-end">
+                                <span class="text-sm font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded mb-1">${item.building}</span>
+                                <span class="text-sm text-gray-500 font-mono">${item.room}室</span>
+                            </div>
+                        </div>
+
+                        <div class="text-sm text-gray-700 mb-3 leading-relaxed break-words bg-gray-50 p-2 rounded border border-gray-100">
+                            ${item.remarks || '<span class="text-gray-400 italic">無詳細備註</span>'}
+                        </div>
+
+                        <div class="flex flex-wrap mb-1">
+                            ${tagsHtml}
+                        </div>
+
+                        ${imageHtml}
+
+                        <div class="mt-4 pt-3 flex items-center justify-between">
+                            <div class="text-xs text-gray-400 flex items-center">
+                                <i class="fa-regular fa-clock mr-1"></i> ${timeStr}
+                            </div>
+                            <a href="tel:${item.contact}" class="flex items-center text-white bg-brand-blue font-bold text-sm px-4 py-2 rounded-full shadow-md active:bg-blue-700">
+                                <i class="fa-solid fa-phone mr-1"></i> 撥打電話
+                            </a>
+                        </div>
+                        
+                        <div class="mt-4 flex">
+                            ${actionButtons}
+                            <button onclick="navigator.clipboard.writeText(window.location.href); alert('連結已複製')" class="flex-1 py-2.5 text-sm text-gray-600 font-medium bg-gray-100 border border-gray-200 rounded-lg">
+                                <i class="fa-solid fa-share-nodes mr-1"></i> 分享
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return div;
+            }
+        }
+
+        // Initialize App
+        const app = new DisasterReliefApp();
+
+    </script>
+</body>
+</html>
