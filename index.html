@@ -710,6 +710,7 @@
                 document.getElementById('verify-pin-input').value = '';
                 document.getElementById('verify-pin-input').focus();
                 document.getElementById('pin-error').classList.add('hidden');
+                document.getElementById('verify-pin-input').classList.remove('border-red-500', 'text-red-500');
             }
 
             closePinModal() {
@@ -718,64 +719,89 @@
             }
 
             async confirmPin() {
-                const inputPin = document.getElementById('verify-pin-input').value;
-                const entry = this.db.find(e => e.id === this.pendingAction.id);
-                
-                // Debugging: Alert what values are actually being compared
-                // Remove the '//' at the start of the next line if you want to see the values
-                // alert(`調試模式：\n您輸入的: "${inputPin}"\n系統儲存的: "${entry.pin}"`);
-
-                // Validate PIN Locally first
-                if (entry && String(inputPin) === String(entry.pin)) {
+                try {
+                    // 1. Get Inputs
+                    const inputPin = document.getElementById('verify-pin-input').value;
                     
-                    if (this.isDemoMode) {
-                         // Local Update Only for Demo
-                        entry.status = this.pendingAction.newStatus;
-                        entry.timestamp = Date.now();
-                        this.applyFilters();
+                    // 2. Check if pending action exists
+                    if (!this.pendingAction || !this.pendingAction.id) {
+                        alert("系統錯誤：找不到待處理的操作。請重新整理網頁。");
                         this.closePinModal();
-                        alert('演示模式：狀態已更新 (僅本地有效)');
                         return;
                     }
-                    
-                    // Show Loading
-                    const btn = document.getElementById('btn-confirm-pin');
-                    const originalText = btn.innerText;
-                    btn.innerHTML = '<div class="loader w-4 h-4 border-white border-t-transparent"></div>';
-                    
-                    try {
-                         // Send update to Cloud
-                        await fetch(this.API_URL, {
-                            method: 'POST',
-                            mode: 'no-cors',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                action: 'update', 
-                                data: { 
-                                    id: entry.id, 
-                                    status: this.pendingAction.newStatus,
-                                    timestamp: Date.now() 
-                                } 
-                            })
-                        });
 
-                        // Local Update
-                        entry.status = this.pendingAction.newStatus;
-                        entry.timestamp = Date.now();
-                        this.applyFilters();
+                    // 3. Find Entry
+                    const entry = this.db.find(e => e.id === this.pendingAction.id);
+                    if (!entry) {
+                        alert("系統錯誤：找不到該條目。可能已被刪除。");
                         this.closePinModal();
-                        alert('狀態更新成功！');
-                        
-                    } catch (e) {
-                        alert('更新失敗，請檢查網路');
-                    } finally {
-                        btn.innerText = originalText;
+                        return;
                     }
 
-                } else {
-                    // Show mismatch alert for easy debugging
-                    alert(`錯誤：密碼不匹配。\n\n您輸入的: "${inputPin}"\n正確密碼: "${entry.pin}"`);
-                    document.getElementById('pin-error').classList.remove('hidden');
+                    // 4. Robust PIN Comparison
+                    const storedPin = String(entry.pin || "").trim();
+                    const userPin = String(inputPin || "").trim();
+                    
+                    // Check exact string match OR number match (handles 0213 vs 213)
+                    const isMatch = (storedPin === userPin) || 
+                                    (parseInt(storedPin, 10) === parseInt(userPin, 10));
+
+                    if (isMatch) {
+                        // ... Proceed with update ...
+                        // UI Loading State
+                        const btn = document.getElementById('btn-confirm-pin');
+                        const originalText = btn.innerText;
+                        btn.innerHTML = '<div class="loader w-4 h-4 border-white border-t-transparent mx-auto"></div>';
+                        btn.disabled = true;
+
+                        try {
+                            // Demo Mode Check
+                            if (this.isDemoMode) {
+                                // ... local update ...
+                                alert('演示模式：狀態已更新 (僅本地有效)');
+                                this.closePinModal();
+                                return;
+                            }
+
+                            // Cloud Update
+                            await fetch(this.API_URL, {
+                                method: 'POST',
+                                mode: 'no-cors',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    action: 'update', 
+                                    data: { 
+                                        id: entry.id, 
+                                        status: this.pendingAction.newStatus,
+                                        timestamp: Date.now() 
+                                    } 
+                                })
+                            });
+
+                            // Local Reflect
+                            entry.status = this.pendingAction.newStatus;
+                            entry.timestamp = Date.now();
+                            this.applyFilters();
+                            this.closePinModal();
+                            alert('✅ 狀態更新成功！');
+
+                        } catch (networkError) {
+                            console.error(networkError);
+                            alert('❌ 更新失敗：網絡連接問題。');
+                        } finally {
+                            btn.innerText = originalText;
+                            btn.disabled = false;
+                        }
+
+                    } else {
+                        // 5. Pin Mismatch
+                        alert("❌ 密碼錯誤，請重新輸入。");
+                        document.getElementById('pin-error').classList.remove('hidden');
+                        document.getElementById('verify-pin-input').classList.add('border-red-500', 'text-red-500');
+                    }
+                } catch (err) {
+                    console.error("ConfirmPin Error:", err);
+                    alert("發生未預期的錯誤：" + err.message);
                 }
             }
 
