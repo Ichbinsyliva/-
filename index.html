@@ -39,7 +39,7 @@
             <div class="flex items-center">
                 <h1 class="text-lg font-bold text-gray-900 flex items-center mr-2">
                     <i class="fa-solid fa-house-chimney-crack text-brand-red mr-2"></i>
-                    宏福苑尋親
+                    宏福苑災後尋親資訊平台
                 </h1>
             </div>
             <div class="flex gap-2">
@@ -115,7 +115,7 @@
                         <label class="block text-xs font-medium text-gray-700 mb-1">大樓座號 (宏福苑) <span class="text-red-500">*</span></label>
                         <select id="input-building" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm bg-white">
                             <option value="">請選擇座號</option>
-                            
+
                             <option value="宏仁閣 (A座)">宏仁閣 (A座)</option>
                             <option value="宏道閣 (B座)">宏道閣 (B座)</option>
                             <option value="宏新閣 (C座)">宏新閣 (C座)</option>
@@ -162,7 +162,8 @@
                 <div class="space-y-2">
                     <!-- Modified: Label changed to '聯繫電話/ig' -->
                     <label class="block text-xs font-medium text-gray-700">聯繫電話/ig <span class="text-red-500">*</span></label>
-                    <input type="tel" id="input-contact" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm">
+                    <!-- Changed type="tel" to type="text" to allow IG handles -->
+                    <input type="text" id="input-contact" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm" placeholder="請輸入電話號碼或 IG 帳號">
                 </div>
             </div>
         </div>
@@ -239,7 +240,7 @@
 
         class DisasterReliefApp {
             constructor() {
-                 
+
                 this.API_URL = 'https://script.google.com/macros/s/AKfycbzVzV_1oB5l6tWgX3i_5ogin6QYfabPd5nIZ5I_nmHA3knWdcBagQORd-9DH3DlQOM/exec';
                 
                 this.db = [];
@@ -498,6 +499,20 @@
                     btns = `<button onclick="app.requestUpdateStatus('${item.id}', 'found')" class="flex-1 py-2.5 text-sm text-green-700 font-bold bg-green-50 rounded-lg border border-green-200 mr-2"><i class="fa-solid fa-house-user mr-1"></i> 標記主人已領回</button>`;
                 }
 
+                // Determine contact link type (tel: or instagram link if possible, or just text)
+                let contactLink = '';
+                const contactStr = String(item.contact || '');
+                // Simple check: if it looks like a phone number (digits only, maybe spaces/dashes), make it tel:
+                // Otherwise treat as text (or IG link logic could be added, but simple text is safer)
+                const isPhoneNumber = /^[\d\s\-\+\(\)]+$/.test(contactStr);
+                
+                if (isPhoneNumber) {
+                    contactLink = `<a href="tel:${contactStr}" class="text-white bg-brand-blue px-3 py-1.5 rounded-full font-bold"><i class="fa-solid fa-phone"></i> 撥打</a>`;
+                } else {
+                    // If not a phone number, display copy button or just text
+                    contactLink = `<button onclick="navigator.clipboard.writeText('${contactStr}');alert('已複製聯繫方式')" class="text-white bg-brand-blue px-3 py-1.5 rounded-full font-bold text-xs"><i class="fa-brands fa-instagram"></i> / <i class="fa-solid fa-copy"></i> 複製</button>`;
+                }
+
                 const div = document.createElement('div');
                 div.className = `bg-white rounded-xl card-shadow overflow-hidden border-l-4 ${s.border} relative`;
                 div.innerHTML = `
@@ -511,8 +526,11 @@
                         <div class="flex flex-wrap mb-1">${(item.tags||[]).map(t=>`<span class="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border mr-1">#${t}</span>`).join('')}</div>
                         ${imgHtml}
                         <div class="mt-4 pt-3 flex items-center justify-between text-xs text-gray-400">
-                            <div><i class="fa-regular fa-clock mr-1"></i> ${timeStr}</div>
-                            <a href="tel:${item.contact}" class="text-white bg-brand-blue px-3 py-1.5 rounded-full font-bold"><i class="fa-solid fa-phone"></i> 撥打</a>
+                            <div class="flex items-center"><i class="fa-regular fa-clock mr-1"></i> ${timeStr}</div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-600 font-medium bg-gray-100 px-2 py-1 rounded max-w-[100px] truncate">${contactStr}</span>
+                                ${contactLink}
+                            </div>
                         </div>
                         <div class="mt-4 flex">${btns}<button onclick="navigator.clipboard.writeText(window.location.href);alert('已複製')" class="flex-1 py-2.5 text-sm text-gray-600 bg-gray-100 rounded-lg border border-gray-200"><i class="fa-solid fa-share-nodes"></i></button></div>
                     </div>`;
