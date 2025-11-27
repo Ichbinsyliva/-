@@ -115,14 +115,15 @@
                         <label class="block text-xs font-medium text-gray-700 mb-1">大樓座號 (宏福苑) <span class="text-red-500">*</span></label>
                         <select id="input-building" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm bg-white">
                             <option value="">請選擇座號</option>
-                            <option value="宏仁樓 (A座)">宏仁閣 (A座)</option>
-                            <option value="宏道樓 (B座)">宏道閣 (B座)</option>
-                            <option value="宏新樓 (C座)">宏新閣 (C座)</option>
-                            <option value="宏建樓 (D座)">宏建閣 (D座)</option>
-                            <option value="宏泰樓 (E座)">宏泰閣 (E座)</option>
-                            <option value="宏昌樓 (F座)">宏昌閣 (F座)</option>
-                            <option value="宏盛樓 (G座)">宏盛閣 (G座)</option>
-                            <option value="宏志樓 (H座)">宏志閣 (H座)</option>
+                            
+                            <option value="宏仁閣 (A座)">宏仁閣 (A座)</option>
+                            <option value="宏道閣 (B座)">宏道閣 (B座)</option>
+                            <option value="宏新閣 (C座)">宏新閣 (C座)</option>
+                            <option value="宏建閣 (D座)">宏建閣 (D座)</option>
+                            <option value="宏泰閣 (E座)">宏泰閣 (E座)</option>
+                            <option value="宏昌閣 (F座)">宏昌閣 (F座)</option>
+                            <option value="宏盛閣 (G座)">宏盛閣 (G座)</option>
+                            <option value="宏志閣 (H座)">宏志閣 (H座)</option>
                         </select>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
@@ -159,7 +160,8 @@
                     <div id="tags-container" class="flex flex-wrap gap-2 pt-1 min-h-[24px]"></div>
                 </div>
                 <div class="space-y-2">
-                    <label class="block text-xs font-medium text-gray-700">聯繫電話 *</label>
+                    <!-- Modified: Label changed to '聯繫電話/ig' -->
+                    <label class="block text-xs font-medium text-gray-700">聯繫電話/ig <span class="text-red-500">*</span></label>
                     <input type="tel" id="input-contact" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm">
                 </div>
             </div>
@@ -183,7 +185,7 @@
                     <input type="text" id="report-name" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm" placeholder="如何稱呼您">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">您的聯繫電話或ig</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">您的聯繫電話</label>
                     <input type="tel" id="report-contact" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm" placeholder="管理員聯絡用">
                 </div>
                 <div>
@@ -237,7 +239,7 @@
 
         class DisasterReliefApp {
             constructor() {
-                // 👇 這裡已經更新為您提供的新網址
+                 
                 this.API_URL = 'https://script.google.com/macros/s/AKfycbzVzV_1oB5l6tWgX3i_5ogin6QYfabPd5nIZ5I_nmHA3knWdcBagQORd-9DH3DlQOM/exec';
                 
                 this.db = [];
@@ -288,7 +290,8 @@
             loadDemoData(c, a) {
                 this.isDemoMode = true;
                 if(a) a.classList.remove('hidden');
-                this.db = [{id:'d1',building:'宏仁樓 (A座)',room:'101',name:'演示數據(請檢查後端部署)',status:'missing',tags:[],timestamp:Date.now(),photos:[],pin:'1234'}];
+                // Updated Demo Data to reflect Building Name Changes
+                this.db = [{id:'d1',building:'宏仁閣 (A座)',room:'101',name:'演示數據(請檢查後端部署)',status:'missing',tags:[],timestamp:Date.now(),photos:[],pin:'1234'}];
                 this.applyFilters();
             }
 
@@ -490,7 +493,7 @@
                 // Button Logic
                 let btns = '';
                 if (item.status === 'missing' || item.status === 'pet_missing') {
-                    btns = `<button onclick="app.requestUpdateStatus('${item.id}', 'found')" class="flex-1 py-2.5 text-sm text-green-700 font-bold bg-green-50 rounded-lg border border-green-200 mr-2"><i class="fa-solid fa-check mr-1"></i> 標記已找到</button>`;
+                    btns = `<button onclick="app.requestUpdateStatus('${item.id}', '${item.status === 'pet_missing' ? 'pet_found' : 'found'}')" class="flex-1 py-2.5 text-sm text-green-700 font-bold bg-green-50 rounded-lg border border-green-200 mr-2"><i class="fa-solid fa-check mr-1"></i> 標記已找到</button>`;
                 } else if (item.status === 'pet_found') {
                     btns = `<button onclick="app.requestUpdateStatus('${item.id}', 'found')" class="flex-1 py-2.5 text-sm text-green-700 font-bold bg-green-50 rounded-lg border border-green-200 mr-2"><i class="fa-solid fa-house-user mr-1"></i> 標記主人已領回</button>`;
                 }
@@ -520,4 +523,3 @@
     </script>
 </body>
 </html>
-
