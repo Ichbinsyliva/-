@@ -195,14 +195,14 @@
                         <label class="block text-xs font-medium text-gray-700 mb-1">大樓座號 (宏福苑) <span class="text-red-500">*</span></label>
                         <select id="input-building" class="w-full border-gray-300 border rounded-lg p-2.5 text-sm focus:ring-brand-blue focus:border-brand-blue bg-white">
                             <option value="">請選擇座號</option>
-                            <option value="宏仁樓 (A座)">宏仁閣 (A座)</option>
-                            <option value="宏道樓 (B座)">宏道閣 (B座)</option>
-                            <option value="宏新樓 (C座)">宏新閣 (C座)</option>
-                            <option value="宏建樓 (D座)">宏建閣 (D座)</option>
-                            <option value="宏泰樓 (E座)">宏泰閣 (E座)</option>
-                            <option value="宏昌樓 (F座)">宏昌閣 (F座)</option>
-                            <option value="宏盛樓 (G座)">宏盛閣 (G座)</option>
-                            <option value="宏志樓 (H座)">宏志閣 (H座)</option>
+                            <option value="宏仁樓 (A座)">宏仁樓 (A座)</option>
+                            <option value="宏道樓 (B座)">宏道樓 (B座)</option>
+                            <option value="宏新樓 (C座)">宏新樓 (C座)</option>
+                            <option value="宏建樓 (D座)">宏建樓 (D座)</option>
+                            <option value="宏泰樓 (E座)">宏泰樓 (E座)</option>
+                            <option value="宏昌樓 (F座)">宏昌樓 (F座)</option>
+                            <option value="宏盛樓 (G座)">宏盛樓 (G座)</option>
+                            <option value="宏志樓 (H座)">宏志樓 (H座)</option>
                         </select>
                     </div>
 
@@ -721,6 +721,10 @@
                 const inputPin = document.getElementById('verify-pin-input').value;
                 const entry = this.db.find(e => e.id === this.pendingAction.id);
                 
+                // Debugging: Alert what values are actually being compared
+                // Remove the '//' at the start of the next line if you want to see the values
+                // alert(`調試模式：\n您輸入的: "${inputPin}"\n系統儲存的: "${entry.pin}"`);
+
                 // Validate PIN Locally first
                 if (entry && String(inputPin) === String(entry.pin)) {
                     
@@ -769,6 +773,8 @@
                     }
 
                 } else {
+                    // Show mismatch alert for easy debugging
+                    alert(`錯誤：密碼不匹配。\n\n您輸入的: "${inputPin}"\n正確密碼: "${entry.pin}"`);
                     document.getElementById('pin-error').classList.remove('hidden');
                 }
             }
@@ -906,5 +912,4 @@
 
     </script>
 </body>
-
 </html>
