@@ -730,10 +730,12 @@
                         return;
                     }
 
-                    // 3. Find Entry
-                    const entry = this.db.find(e => e.id === this.pendingAction.id);
+                    // 3. Find Entry (Robust Finding)
+                    // Convert both to String to ensure "123" matches 123
+                    const entry = this.db.find(e => String(e.id) === String(this.pendingAction.id));
+                    
                     if (!entry) {
-                        alert("系統錯誤：找不到該條目。可能已被刪除。");
+                        alert("系統錯誤：找不到該條目。可能已被刪除，請重新整理網頁。");
                         this.closePinModal();
                         return;
                     }
