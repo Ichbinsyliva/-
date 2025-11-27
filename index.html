@@ -39,7 +39,7 @@
             <div class="flex items-center">
                 <h1 class="text-lg font-bold text-gray-900 flex items-center mr-2">
                     <i class="fa-solid fa-house-chimney-crack text-brand-red mr-2"></i>
-                    宏福苑災後尋親資訊平台
+                    宏福苑尋親
                 </h1>
             </div>
             <div class="flex gap-2">
@@ -333,8 +333,7 @@
             handleRemarksInput(t){ const s=document.getElementById('ai-tag-status'); if(t.length>2){ s.classList.remove('hidden'); setTimeout(async()=>{const tags=await this.aiService.autoCategorize(t);this.autoTags=tags;this.renderTags(tags);s.classList.add('hidden');},800); }else{s.classList.add('hidden');} }
             renderTags(t){ document.getElementById('tags-container').innerHTML=t.map(x=>`<span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full flex items-center mr-1 mb-1">#${x}</span>`).join(''); }
             
-            // New Instant Search Logic (No AI Delay)
-            // Fixed: Force fields to string before lowercase
+            // Fixed: Force all fields to String() before lowercase to avoid crash on numbers
             handleSearch(query) {
                 if (!query) {
                     this.applyFilters();
@@ -528,7 +527,15 @@
                     `;
                 } 
                 else if (item.status === 'pet_missing') {
-                    btns = `<button onclick="app.requestUpdateStatus('${item.id}', 'found')" class="flex-1 py-2.5 text-sm text-green-700 font-bold bg-green-50 rounded-lg border border-green-200 mr-2"><i class="fa-solid fa-check mr-1"></i> 標記已找到</button>`;
+                    btns = `
+                        <div class="flex flex-col gap-2 w-full">
+                            <div class="flex gap-2">
+                                <button onclick="app.requestUpdateStatus('${item.id}', 'found')" class="flex-1 py-2 text-sm text-green-700 font-bold bg-green-50 rounded-lg border border-green-200"><i class="fa-solid fa-check mr-1"></i> 已回家/平安</button>
+                                <button onclick="app.requestUpdateStatus('${item.id}', 'pet_found')" class="flex-1 py-2 text-sm text-purple-700 font-bold bg-purple-50 rounded-lg border border-purple-200"><i class="fa-solid fa-hand-holding-heart mr-1"></i> 發現/待認領</button>
+                            </div>
+                            <button onclick="app.requestUpdateStatus('${item.id}', 'deceased')" class="w-full py-2 text-sm text-gray-500 font-bold bg-gray-100 rounded-lg border border-gray-200"><i class="fa-solid fa-ribbon mr-1"></i> 標記為已罹難</button>
+                        </div>
+                    `;
                 } 
                 else if (item.status === 'pet_found') {
                     btns = `<button onclick="app.requestUpdateStatus('${item.id}', 'found')" class="flex-1 py-2.5 text-sm text-green-700 font-bold bg-green-50 rounded-lg border border-green-200 mr-2"><i class="fa-solid fa-house-user mr-1"></i> 標記主人已領回</button>`;
